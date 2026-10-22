@@ -31,6 +31,10 @@ single time.
 
   Hover the icon for the exact percentage.
 - **Starts with Windows**, quietly, in the notification area.
+- **Quiet updates.** The app checks GitHub for a newer release every few hours. If there is one, an
+  **Atualizar para a versão X.Y.Z** (Update to version X.Y.Z) item appears in the tray menu — no
+  pop-ups, no reminders. Click it if you want it: the installer is downloaded, its SHA-256 is checked
+  against the one GitHub publishes, and the new version replaces the old one and starts by itself.
 
 It never pairs a controller that Windows has no pairing for on its own (that is left to you), so it
 won't get in the way if you prefer pairing from Windows Settings.
@@ -74,6 +78,12 @@ with just the Xbox button, even with a valid pairing. The app tries the document
 (`GattSession.MaintainConnection`, connection attempts on advertisement), but if Windows refuses,
 holding the pair button (one-step re-pairing) is the reliable path. Details and measurements are in
 [`docs/manual-tests.md`](docs/manual-tests.md).
+
+## Updates
+
+Update checks call `https://api.github.com/repos/rafarvns/bluetooth-auto-reconnect/releases/latest`
+(anonymously, every 6 hours) and only ever show a menu item. To turn them off, set
+`"Updates": { "Enabled": false }` in `appsettings.json` next to the installed exe.
 
 ## Troubleshooting
 

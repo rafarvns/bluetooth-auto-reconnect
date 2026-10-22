@@ -171,6 +171,19 @@ Not a Windows Service, and no elevated scheduled task: pairing works unelevated,
 value; user data in `%LOCALAPPDATA%\BluetoothAutoReconnect` (devices.json, logs) is kept.
 The version comes from `<Version>` in the app `.csproj`. The installer is not code-signed.
 
+**Updates.** `Host/Updates/UpdateService` checks `releases/latest` of `Updates:Repository` at start
+and every `Updates:CheckInterval` (6 h). `ReleaseParser` (pure, tested) accepts a non-draft,
+non-prerelease tag newer than the assembly version with an HTTPS `*-Setup-*.exe` asset. A newer
+release only reveals a tray menu item — **never notify or prompt** (explicit user requirement). On
+click: download to %TEMP%, verify size and the asset's `digest` (sha256), run it with
+`/SILENT /SUPPRESSMSGBOXES /NORESTART`, exit. The installer closes the old exe
+(`CloseApplications=force`) and relaunches via the `Check: WizardSilent` [Run] entry; the new
+instance waits up to 10 s for the old one's mutex. Downloaded installers are deleted at next start.
+Update-check failures are logged and swallowed: a throwing `BackgroundService` stops the whole host.
+Verified 2026-10-21: 0.9.0 test build → downloaded v1.0.0, hash checked, installed; local 1.1.0
+installer with `/SILENT` closed v1.0.0 and relaunched 1.1.0. Releases must keep the
+`BluetoothAutoReconnect-Setup-<version>.exe` asset name and a `v<semver>` tag.
+
 **Privacy.** The repo is public. Never commit real device addresses, PnP instance IDs or other
 machine identifiers — use `12:34:56:78:9A:BC` / `<ADDRESS>` placeholders. The default
 `Agent:ManagedDevices` is empty; real devices live only in the user's `devices.json`.

@@ -13,6 +13,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
 #if LOG_WINDOW
     private readonly SingleInstanceWindow _logWindow;
 #endif
+    private readonly ToolStripMenuItem _updateItem = new() { Visible = false };
+    private Func<IProgress<int>, Task<bool>>? _installUpdate;
+    private Version? _updateVersion;
     private BatteryBucket? _currentBucket;
 
     public TrayApplicationContext()
@@ -27,6 +30,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _logWindow = new SingleInstanceWindow(logItem);
         menu.Items.Add(logItem);
 #endif
+        // Hidden until a newer release exists; the user decides whether to click it.
+        _updateItem.Click += OnUpdateClicked;
+        menu.Items.Add(_updateItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Sair", null, (_, _) => ExitThread());
 
@@ -46,6 +52,43 @@ internal sealed class TrayApplicationContext : ApplicationContext
 #if LOG_WINDOW
     public void SetLogWindowFactory(Func<Form> factory) => _logWindow.Factory = factory;
 #endif
+
+    public void SetUpdateHandler(Func<IProgress<int>, Task<bool>> installUpdate) => _installUpdate = installUpdate;
+
+    /// <summary>Reveals the update menu item. Deliberately silent: no balloon, no prompt.</summary>
+    public void ShowUpdateAvailable(Version version)
+    {
+        if (_updateVersion == version && _updateItem.Visible)
+        {
+            return;
+        }
+
+        _updateVersion = version;
+        _updateItem.Text = $"Atualizar para a versão {version.ToString(3)}";
+        _updateItem.Enabled = true;
+        _updateItem.Visible = true;
+    }
+
+    private async void OnUpdateClicked(object? sender, EventArgs e)
+    {
+        if (_installUpdate is null)
+        {
+            return;
+        }
+
+        _updateItem.Enabled = false;
+        _updateItem.Text = "Baixando atualização…";
+        var progress = new Progress<int>(percent => _updateItem.Text = $"Baixando atualização… {percent}%");
+        if (await _installUpdate(progress))
+        {
+            // The installer replaces the files and starts the new version.
+            ExitThread();
+            return;
+        }
+
+        _updateItem.Text = "Falha ao atualizar — tentar de novo";
+        _updateItem.Enabled = true;
+    }
 
     public void Update(BluetoothDeviceState? device)
     {

@@ -1,5 +1,6 @@
 using BluetoothAutoReconnect.Devices;
 using BluetoothAutoReconnect.Host;
+using BluetoothAutoReconnect.Host.Updates;
 using BluetoothAutoReconnect.Reconnect;
 using BluetoothAutoReconnect.Tray;
 
@@ -21,7 +22,7 @@ internal static class Program
 
         // Two agents would race each other's pairing attempts and fight over the log file.
         using var singleInstance = new Mutex(initiallyOwned: true, @"Local\BluetoothAutoReconnect", out var isFirstInstance);
-        if (!isFirstInstance)
+        if (!isFirstInstance && !WaitForPreviousInstance(singleInstance))
         {
             MessageBox.Show(
                 "O Bluetooth Auto Reconnect já está rodando — procure o ícone na bandeja do sistema.",
@@ -64,6 +65,8 @@ internal static class Program
         builder.Services.AddSingleton<IReconnectStrategy>(sp => sp.GetRequiredService<MaintainConnectionStrategy>());
         builder.Services.AddSingleton<IReconnectStrategy>(sp => sp.GetRequiredService<AdvertisementConnectStrategy>());
         builder.Services.AddHostedService<DeviceMonitor>();
+        builder.Services.Configure<UpdateOptions>(builder.Configuration.GetSection(UpdateOptions.SectionName));
+        builder.Services.AddHostedService<UpdateService>();
 
         using var host = builder.Build();
         tray.SetPairingWindowFactory(() => ActivatorUtilities.CreateInstance<PairingForm>(host.Services));
@@ -85,6 +88,23 @@ internal static class Program
         {
             host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
             Log.CloseAndFlush();
+        }
+    }
+
+    /// <summary>
+    /// After an in-app update the installer starts the new version while the old one may still be
+    /// shutting down, so give it a moment to release the mutex before declaring a duplicate.
+    /// </summary>
+    private static bool WaitForPreviousInstance(Mutex singleInstance)
+    {
+        try
+        {
+            return singleInstance.WaitOne(TimeSpan.FromSeconds(10));
+        }
+        catch (AbandonedMutexException)
+        {
+            // The previous instance exited without releasing it; ownership is ours now.
+            return true;
         }
     }
 }
